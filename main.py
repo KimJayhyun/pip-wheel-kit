@@ -41,7 +41,6 @@ def pip_download_with_platform(
     python_version: str = None,
     requirements: Path = None,
 ):
-    """2~3단계: 플랫폼별 바이너리 wheel"""
     for i, platform in enumerate(platforms, start=2):
         print(f"\n🖥️  [{i}/{len(platforms) + 1}] Downloading for platform: {platform}")
         cmd = [sys.executable, "-m", "pip", "download", "-d", str(output_dir)]
@@ -55,7 +54,25 @@ def pip_download_with_platform(
         if python_version:
             cmd += ["--python-version", python_version]
 
-        subprocess.run(cmd, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        if result.returncode != 0:
+            stderr = result.stderr
+            # 바이너리 wheel이 없는 경우 → 경고만 출력하고 계속 진행
+            if (
+                "No matching distribution" in stderr
+                or "ResolutionImpossible" in stderr
+                or "Could not find a version" in stderr
+            ):
+                print(
+                    f"  ⚠️  [{platform}] 바이너리 wheel 없음, 건너뜀 (1단계에서 이미 다운로드됨)"
+                )
+            else:
+                # 예상치 못한 에러는 그대로 raise
+                print(stderr)
+                raise subprocess.CalledProcessError(result.returncode, cmd)
+        else:
+            print(f"  ✅ [{platform}] 완료")
 
 
 def main():
